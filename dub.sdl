@@ -1,0 +1,5 @@
+name "aws-api"
+description "AWS api builder."
+authors "Igor Khasilev"
+license "MIT"
+dependency "requests" version="~>0.5.0"
