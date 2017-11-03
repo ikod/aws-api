@@ -1,15 +1,15 @@
 module drivers;
 
 import std.typecons;
+import std.traits;
 
 import utils;
 
 import requests;
 
-
 alias Result = Tuple!(int, "code", ubyte[], "body");
 
-Result exec(Auth_Args args, string[string] headers) {
+auto exec(Auth_Args args, string[string] headers) {
     ubyte[] r_body;
     int     r_code;
     Request rq = Request();

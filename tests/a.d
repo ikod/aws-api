@@ -12,5 +12,14 @@ void main(string[] args){
     }
     immutable s3c = s3_config(aws_access, aws_secret, "us-east-1");
     auto buckets = ListBuckets(s3c);
-    writeln(buckets);
+    foreach(bucket; buckets.Buckets) {
+        auto bucketName = bucket.Name;
+        auto objectList = ListObjects(s3c, ListObjectsRequest_Type(bucketName));
+        writefln("bucket = %s", bucketName);
+        //auto bucketLocation = GetBucketLocation(s3c, GetBucketLocationRequest_Type(bucketName));
+        //writeln(bucketLocation);
+        foreach(o; objectList.Contents) {
+            writefln(" %s", o.Key);
+        }
+    }
 }

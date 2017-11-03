@@ -2,8 +2,62 @@ module utils;
 
 import std.datetime;
 import std.string;
+import std.traits;
+import std.xml;
 
 import requests;
+
+auto decodeFromXml(T)(Element e) {
+    T V;
+    static if (is(T==struct )) {
+        V = T(e);
+    } else static if ( isArray!T && !isSomeString!T ) {
+        V = decodeArray!T(e);
+    } else {
+        V = decodeElement!T(e);
+    }
+    return V;
+}
+
+auto decodeFromXmlFlattenedArray(T)(Element e) {
+    import std.range.primitives;
+    import std.stdio;
+
+    alias ArrayElement_Type = ElementType!T;
+    ArrayElement_Type result;
+    result = decodeFromXml!ArrayElement_Type(e);
+    return result;
+}
+
+T decodeArray(T)(Element e) {
+    T result;
+    alias _Member_Type = ForeachType!T;
+    _Member_Type _m;
+
+    foreach(i; e.elements) {
+
+        static if (is(_Member_Type == struct )) {
+            _m = _Member_Type(i);
+        } else
+        static if ( isSomeString!_Member_Type ) {
+            _m = decodeElement!_Member_Type(i);
+        } else
+        static if ( isArray!_Member_Type ) {
+            _m = decodeArray!_Member_Type(i);
+        } else {
+            _m = decodeElement!_Member_Type(i);
+        }
+        result ~= _m;
+    }
+    return result;
+}
+
+T decodeElement(T)(Element e) {
+    import std.stdio;
+    import std.conv;
+    return to!T(e.text);
+}
+
 
 string toRFC822date(SysTime st) {
     import core.stdc.time: gmtime, strftime;

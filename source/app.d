@@ -11,9 +11,9 @@ import std.experimental.logger;
 
 import requests;
 
-void processShape(string name, JSONValue shape, File output) {
+void processShape(string name, JSONValue shape, File output, JSONValue shapes) {
     void processString(JSONValue data) {
-        if ( "enum" in data.object ) {
+        if ( false && "enum" in data.object ) {
             output.writefln("enum %s_Type: string {_init_=\"\", %s};\n", name,
                 data.object["enum"].array.
                     map!(o =>
@@ -44,14 +44,17 @@ void processShape(string name, JSONValue shape, File output) {
         output.writefln("alias %s_Type = %s;\n", name, T.stringof);
     }
     void processList(JSONValue data) {
-        //writefln("list %s %s;\n", name, data);
-        output.writefln("alias %s_Type = %s;\n", name, "int");
+        auto member = data.object["member"].object["shape"].str;
+        output.writefln("alias %s_Type = %s_Type[];\n", name, member);
     }
     void processSysTime(JSONValue data) {
         output.writeln();
         output.writefln("struct %s_Type {", name);
         output.writeln("    SysTime value;");
         output.writeln("    string toString() {return value.toRFC822date;};");
+        output.writeln("    this(Element xml){");
+        output.writeln("        value = SysTime.fromISOExtString(xml.text);");
+        output.writeln("    }");
         output.writeln("};");
     }
     void processStructure(JSONValue data) {
@@ -78,6 +81,27 @@ void processShape(string name, JSONValue shape, File output) {
             }
             output.writeln("    }");
         }
+        output.writefln("    this(Element xml) {");
+        output.writefln("        foreach(e; xml.elements) {\n" ~
+                        "            switch(e.tag.name) {");
+        foreach(m; data.object["members"].object.byKeyValue) {
+            auto member_data = m.value;
+            auto member_name = m.key;
+            string member_type = member_data.object["shape"].str;
+            auto   member_info = shapes.object[member_type].object;
+            if ( member_info["type"].str == "list" && "flattened" in member_info ) {
+                output.writefln(
+                        q{             case "%s": %s ~= decodeFromXmlFlattenedArray!%s_Type(e);break;}, member_name, member_name, member_type);
+            } else {
+                output.writefln(
+                        q{             case "%s": %s = decodeFromXml!%s_Type(e);break;}, member_name, member_name, member_type);
+            }
+        }
+
+        output.writefln("            default: assert(0);");
+        output.writefln("            }");
+        output.writefln("        }");
+        output.writefln("    }");
         output.writeln("};");
     }
     string shapeType = shape.object["type"].str;
@@ -234,7 +258,10 @@ void processOperation(string api_name, string name, JSONValue data, JSONValue sh
     //.format(http_method));
     //
     if ( outputType !is null ) {
-        o.writefln("    %s_Type result;", outputType);
+        o.writefln(q{
+            auto xml = new Document(cast(string)r.body);
+            auto result = %s_Type(xml);
+        }, outputType);
         o.writefln("    return result;");
     }
     o.writefln("}\n");
@@ -263,7 +290,7 @@ void generate(DirEntry api_file) {
     output.writefln(q{immutable string api_version = "%s";}.format(metadata.object["apiVersion"].str));
 
     foreach(kv; shapes.object.byKeyValue) {
-        processShape(kv.key, kv.value, output);
+        processShape(kv.key, kv.value, output, shapes);
     }
     foreach(kv; operations.object.byKeyValue) {
         processOperation(api_name, kv.key, kv.value, shapes, output);

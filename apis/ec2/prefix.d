@@ -3,6 +3,7 @@ module apis.ec2;
 import std.datetime;
 import std.array;
 import std.algorithm;
+import std.xml;
 
 import utils;
 import drivers;

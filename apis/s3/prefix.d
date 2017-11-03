@@ -5,6 +5,7 @@ import std.array;
 import std.algorithm;
 import std.conv;
 import std.string;
+import std.xml;
 import core.stdc.time: strftime;
 
 import utils;
