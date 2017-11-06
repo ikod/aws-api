@@ -7,13 +7,13 @@ import utils;
 
 import requests;
 
-alias Result = Tuple!(int, "code", ubyte[], "body");
+alias Result = Tuple!(int, "responseCode", ubyte[], "responseBody");
 
 auto exec(Auth_Args args, string[string] headers) {
     ubyte[] r_body;
     int     r_code;
     Request rq = Request();
-    rq.verbosity = 1;
+    //rq.verbosity = 1;
     rq.addHeaders(headers);
 
     string url = "https://" ~ args.endpoint ~ args.requestUri;
@@ -36,6 +36,5 @@ auto exec(Auth_Args args, string[string] headers) {
     }
     r_code = r.code;
     r_body = r.responseBody.data;
-
     return Result(r_code, r_body);
 }

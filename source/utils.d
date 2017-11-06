@@ -4,6 +4,9 @@ import std.datetime;
 import std.string;
 import std.traits;
 import std.xml;
+import std.json;
+import std.typecons;
+import std.functional;
 
 import requests;
 
@@ -163,3 +166,11 @@ string[string] build_headers(const Auth_Args args) {
     headers["x-amz-content-sha256"] = payload_hash;
     return headers;
 }
+
+alias SerializedRequest = Tuple!(string, "method", string, "requestUri", string[string], "headers", string[], "query");
+
+auto slowParseJSON(string data) pure {
+    return parseJSON(data);
+}
+alias fastParseJSON = memoize!slowParseJSON;
+
