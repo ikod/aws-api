@@ -13,7 +13,7 @@ auto exec(Auth_Args args, string[string] headers) {
     ubyte[] r_body;
     int     r_code;
     Request rq = Request();
-    //rq.verbosity = 1;
+    rq.verbosity = 1;
     rq.addHeaders(headers);
 
     string url = "https://" ~ args.endpoint ~ args.requestUri;
@@ -36,5 +36,7 @@ auto exec(Auth_Args args, string[string] headers) {
     }
     r_code = r.code;
     r_body = r.responseBody.data;
+    import std.stdio;
+    writeln(cast(string)r_body);
     return Result(r_code, r_body);
 }

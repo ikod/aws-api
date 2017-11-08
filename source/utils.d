@@ -72,15 +72,27 @@ string toRFC822date(SysTime st) {
     return res;
 }
 
-string urlEncoded(string p) pure @safe {
-    immutable string[dchar] translationTable = [
+string urlEncoded(string p, string safe = "") pure @safe {
+    string[dchar] translationTable = [
         ' ':  "%20", '!': "%21", '*': "%2A", '\'': "%27", '(': "%28", ')': "%29",
         ';':  "%3B", ':': "%3A", '@': "%40", '&':  "%26", '=': "%3D", '+': "%2B",
         '$':  "%24", ',': "%2C", '/': "%2F", '?':  "%3F", '#': "%23", '[': "%5B",
         ']':  "%5D", '%': "%25",
     ];
+    string result;
+    foreach(s; safe) {
+        translationTable.remove(s);
+    }
     return p.translate(translationTable);
 }
+unittest {
+    assert(urlEncoded("IDontNeedNoPercentEncoding") == "IDontNeedNoPercentEncoding");
+    assert(urlEncoded("~~--..__") == "~~--..__");
+    assert(urlEncoded("0123456789") == "0123456789");
+
+    assert(urlEncoded("abc//~", "/") == "abc//~");
+}
+
 
 struct Auth_Args {
     string access;
@@ -94,7 +106,7 @@ struct Auth_Args {
     immutable ubyte[] payload;
 }
 
-string[string] build_headers(const Auth_Args args) {
+string[string] signV4(const Auth_Args args) {
     string aws_access_key_id = args.access;
     string aws_secret_access_key = args.secret;
     string region = args.region;

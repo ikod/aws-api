@@ -16,6 +16,7 @@ void main(string[] args){
 
     immutable ec2c = ec2_config(aws_access, aws_secret, "us-east-1");
     auto zones = DescribeAvailabilityZones(ec2c, DescribeAvailabilityZonesRequest_Type());
+    auto instances = DescribeInstances(ec2c, DescribeInstancesRequest_Type());
 
     immutable s3c = s3_config(aws_access, aws_secret, "us-east-1");
 
@@ -33,4 +34,8 @@ void main(string[] args){
         }
         break;
     }
+    auto gorq = GetObjectRequest_Type();
+    gorq.Bucket = "7b4f";
+    gorq.Key = "k.sh";
+    writeln(GetObject(s3c, gorq));
 }

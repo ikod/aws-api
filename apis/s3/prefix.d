@@ -10,6 +10,7 @@ import std.xml;
 import core.stdc.time: strftime;
 import std.experimental.logger;
 import std.variant;
+import std.regex;
 
 import utils;
 import drivers;
@@ -28,9 +29,9 @@ struct s3_config {
     }
 }
 
-void customize_query(string name, ref string[string] query) {
-}
-
+//void customize_query(string name, ref string[string] query) {
+//}
+//
 private auto serializeRequest(T)(T i, JSONValue[string] op) {
     SerializedRequest result;
     JSONValue[string] input;
@@ -49,9 +50,22 @@ private auto serializeRequest(T)(T i, JSONValue[string] op) {
         auto location = "location" in descriptor;
         auto shape = "shape" in descriptor;
         if ( location && (*location).str == "uri" && locationName ) {
-            // place it into uri
-            string to_replace = "{%s}".format((*locationName).str);
-            requestUri = requestUri.replace(to_replace, i.serialize(memberName));
+            //
+            // urlencode member, place it into uri
+            // if uri contain template like {Key+} - do not encode /
+            //
+            string key = `\{%s\}`.format((*locationName).str);
+            string key_greedy = `\{%s\+\}`.format((*locationName).str);
+            auto re        = regex(key);
+            auto re_greedy = regex(key_greedy);
+            auto m = matchFirst(requestUri, re);
+            if ( !m.empty ) {
+                requestUri = requestUri.replace(m[0], urlEncoded(i.serialize(memberName)));
+            }
+            m = matchFirst(requestUri, re_greedy);
+            if ( !m.empty ) {
+                requestUri = requestUri.replace(m[0], urlEncoded(i.serialize(memberName), "/"));
+            }
         }
         if ( location && (*location).str == "querystring" && locationName ) {
             // place it into query
