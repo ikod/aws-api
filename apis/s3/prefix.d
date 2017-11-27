@@ -11,27 +11,27 @@ import core.stdc.time: strftime;
 import std.experimental.logger;
 import std.variant;
 import std.regex;
+import std.stdio;
+import std.typecons;
 
 import utils;
 import drivers;
 
 struct s3_config {
-    package immutable string aws_access;
-    package immutable string aws_secret;
-    package immutable string region;
-    package immutable string endpoint = "s3.amazonaws.com";
-    package immutable string service = "s3";
+    package string aws_access;
+    package string aws_secret;
+    package string region;
+    package string endpoint = "s3.amazonaws.com";
+    package string service = "s3";
 
-    this(string a, string s, string r = "us-east-1") {
+    this(string a, string s, string r = "us-east-1", string e = "s3.amazonaws.com") {
         aws_access = a;
         aws_secret = s;
         region = r;
+        endpoint = e;
     }
 }
 
-//void customize_query(string name, ref string[string] query) {
-//}
-//
 private auto serializeRequest(T)(T i, JSONValue[string] op) {
     SerializedRequest result;
     JSONValue[string] input;
@@ -67,6 +67,14 @@ private auto serializeRequest(T)(T i, JSONValue[string] op) {
                 requestUri = requestUri.replace(m[0], urlEncoded(i.serialize(memberName), "/"));
             }
         }
+        if ( location && (*location).str == "header" && locationName ) {
+            string k,v;
+            k = (*locationName).str;
+            v = i.serialize(memberName);
+            if ( v ) {
+                result.headers[k] = "%s".format(v);
+            }
+        }
         if ( location && (*location).str == "querystring" && locationName ) {
             // place it into query
             string k,v;
@@ -95,6 +103,16 @@ private auto serializeRequest(JSONValue[string] op) {
     result.requestUri = requestUri;
     result.query = query;
     return result;
+}
+
+auto handleRedirect(Result r, s3_config config, string op_descriptor) {
+    s3_config new_config;
+    auto x_amz_bucket_region = "x-amz-bucket-region" in r.responseHeaders();
+    if ( x_amz_bucket_region ) {
+        string region = *x_amz_bucket_region;
+        return tuple!("ok", "config")(true, s3_config(config.aws_access, config.aws_secret, region, "s3-%s.amazonaws.com".format(region)));
+    }
+    return tuple!("ok", "config")(false, s3_config());
 }
 
 /// end of prefix

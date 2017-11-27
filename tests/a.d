@@ -4,6 +4,7 @@ import std.experimental.logger;
 
 import apis.s3;
 import apis.ec2;
+import utils;
 
 void main(string[] args){
     string aws_access = environment.get("AWS_ACCESS", null);
@@ -30,12 +31,31 @@ void main(string[] args){
             continue;
         }
         foreach(o; olist.Contents) {
-            writefln("%s - %s", o.LastModified, o.Key);
+            writefln("%s %d - %s", o.LastModified, o.Size, o.Key);
         }
-        break;
+//        break;
     }
+
+    globalLogLevel(LogLevel.info);
+    {
+        auto q = ListBucketMetricsConfigurationsRequest_Type();
+        q.Bucket="7b4f";
+        writeln(ListBucketMetricsConfigurations(s3c, q));
+    }
+    try {
+        auto gbp = GetBucketPolicyRequest_Type();
+        gbp.Bucket = "7b4f";
+        writeln(GetBucketPolicy(s3c, gbp));
+    } catch (APIException e) {
+        writeln(e);
+    }
+    // GetObject return stream
     auto gorq = GetObjectRequest_Type();
     gorq.Bucket = "7b4f";
     gorq.Key = "k.sh";
-    writeln(GetObject(s3c, gorq));
+    auto r = GetObject(s3c, gorq);
+    while (!r.empty) {
+        write(cast(string)r.front);
+        r.popFront;
+    }
 }

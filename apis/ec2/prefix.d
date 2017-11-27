@@ -9,6 +9,7 @@ import std.xml;
 import std.experimental.logger;
 import std.variant;
 import std.conv;
+import std.stdio;
 
 import utils;
 import drivers;

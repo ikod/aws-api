@@ -7,6 +7,8 @@ import std.xml;
 import std.json;
 import std.typecons;
 import std.functional;
+import std.experimental.logger;
+import std.algorithm;
 
 import requests;
 
@@ -103,7 +105,7 @@ struct Auth_Args {
     string requestUri;
     string method;
     string queryString;
-    immutable ubyte[] payload;
+    immutable (ubyte)[] payload;
 }
 
 string[string] signV4(const Auth_Args args) {
@@ -135,6 +137,19 @@ string[string] signV4(const Auth_Args args) {
         auto kSigning = sign(kService, "aws4_request".representation);
         return kSigning;
     }
+    string queryString2canonicalQuery(string queryString) {
+        if (queryString.length == 0) return "";
+        if (queryString[0] == '?') {
+            queryString = queryString[1..$];
+        }
+        string res = queryString.
+                split("&").
+                map!(s => s.canFind("=") ? s : s~"=").
+                join("&");
+        return res;
+    }
+
+    tracef("args: %s", args);
 
     string[string] headers;
     auto now = SysTime(Clock.currStdTime, UTC());
@@ -143,17 +158,25 @@ string[string] signV4(const Auth_Args args) {
     string amzdate = (now - now.fracSecs).toISOString();
     string date = amzdate[0..8];
     string canonical_uri = uri.path;
-    string canonical_querystring = queryString;
+    string canonical_querystring = queryString2canonicalQuery(uri.query ~ args.queryString); // XXX we have to join and sort here
     string canonical_headers, signed_headers;
+
     canonical_headers = "host:" ~ uri.host ~ "\n" ~ "x-amz-date:" ~ amzdate ~ "\n";
     signed_headers = "host;x-amz-date";
 
-    string payload_hash = sha256Of(payload).toHexString.toLower();
+    string payload_hash;
+    if ( payload == "UNSIGNED-PAYLOAD" ) {
+        payload_hash = "UNSIGNED-PAYLOAD";
+    } else {
+        payload_hash = sha256Of(payload).toHexString.toLower();
+    }
     string canonical_request = method ~ "\n" ~ canonical_uri ~ "\n" ~
                 canonical_querystring ~ "\n" ~
                 canonical_headers ~ "\n" ~
                 signed_headers ~ "\n" ~
                 payload_hash;
+
+    tracef("Canonical request: <%s>", canonical_request);
 
     string credential_scope = date ~ "/" ~ region ~ "/" ~ service ~ "/aws4_request";
 
@@ -161,6 +184,9 @@ string[string] signV4(const Auth_Args args) {
                             amzdate ~ "\n" ~
                             credential_scope ~ "\n" ~
                             sha256Of(canonical_request).toHexString!(LetterCase.lower);
+
+    tracef("string to sign: <%s>", string_to_sign);
+
     auto signing_key = getSignatureKey(aws_secret_access_key, date, region, service);
 
     string signature = HMAC!SHA256(signing_key).
@@ -179,10 +205,46 @@ string[string] signV4(const Auth_Args args) {
     return headers;
 }
 
-alias SerializedRequest = Tuple!(string, "method", string, "requestUri", string[string], "headers", string[], "query");
+string getXMLErrorCode(string msg) {
+    auto d = new Document(msg);
+    if ( d.tag.name != "Error" ) {
+        return null;
+    }
+    auto e = d.elements.filter!(e => e.tag.name == "Code");
+    if ( !e.empty ) {
+        return e.front.text;
+    }
+    return null;
+}
+
+class APIException: Exception {
+    short httpCode;
+    string apiCode;
+
+    this(short httpCode, string apiCode, string file = __FILE__, size_t line = __LINE__) {
+        this.httpCode = httpCode;
+        this.apiCode = apiCode;
+        super(apiCode, file, line);
+    }
+}
+
+alias SerializedRequest = Tuple!(string, "method", string, "requestUri", string[string], "headers", string[], "query", immutable(ubyte)[], "payload");
 
 auto slowParseJSON(string data) pure {
     return parseJSON(data);
 }
 alias fastParseJSON = memoize!slowParseJSON;
 
+auto RESTXMLReply(T)(Document d) {
+    //import std.stdio;
+    //writefln("items: %s", d.items);
+    return T(d);
+}
+
+auto RESTXMLReplyBlob(const(ubyte)[] blob) {
+    return blob;
+}
+
+auto RESTXMLReplyString(const(ubyte)[] blob) {
+    return cast(string)blob;
+}
